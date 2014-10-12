@@ -4,6 +4,7 @@
 #include <QListView>
 #include <QMainWindow>
 #include "dirmodel.h"
+#include "dirview.h"
 #include "viewer.h"
 
 class MainWindow : public QMainWindow
@@ -12,7 +13,7 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
 private:
-    QListView *dirView_;
+    DirView *dirView_;
     DirModel *model_;
     Viewer *viewer_;
 

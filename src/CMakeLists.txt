@@ -4,6 +4,7 @@ file(GLOB SRC_LIST_loc
     singleimageitem.cpp
     groupedimages.cpp
     viewer.cpp
+    dirview.cpp
 )
 file(GLOB UI_LIST_loc
 )
@@ -13,6 +14,7 @@ file(GLOB MOC_LIST_loc
     singleimageitem.h
     groupedimages.h
     viewer.h
+    dirview.h
 )
 
 set(SRC_LIST ${SRC_LIST} ${SRC_LIST_loc} PARENT_SCOPE)

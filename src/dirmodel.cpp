@@ -3,6 +3,7 @@
 #include "groupedimages.h"
 #include <QDebug>
 #include <QMutex>
+#include <QMimeData>
 
 DirModel::DirModel(QObject *parent) :
     QStandardItemModel(parent),
@@ -129,9 +130,11 @@ void DirModel::setup(const QStringList &entries)
         else if(cl.size() > 1) {
             GroupedImages *gr = new GroupedImages();
             QString text;
-            for(auto i : cl) text += i->text() + ";";
+            for(auto i : cl) {
+                text += i->text() + ";";
+                gr->appendRow(i);
+            }
             gr->setText(text);
-            gr->setData(cl.front()->data(Qt::DecorationRole), Qt::DecorationRole);
             newItems.push_back(gr);
         }
     }
@@ -144,4 +147,115 @@ void DirModel::emitDataChanged()
 {
     emit dataChanged(QModelIndex(), QModelIndex());
     emit updateRequest();
+}
+
+Qt::ItemFlags DirModel::flags(const QModelIndex &index) const
+{
+    return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
+}
+
+bool DirModel::dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int column, const QModelIndex &parent)
+{
+    if (!data->hasFormat("image/sort-data"))
+        return false;
+
+    if (action == Qt::IgnoreAction)
+        return true;
+
+    if (column > 0)
+        return false;
+
+    if (!parent.isValid())
+        return false;
+
+    SingleImageItem *sParent = dynamic_cast<SingleImageItem*>(itemFromIndex(parent));
+    GroupedImages *gParent = dynamic_cast<GroupedImages*>(itemFromIndex(parent));
+    Q_ASSERT(sParent || gParent);
+
+    QByteArray encodedData = data->data("image/sort-data");
+    QDataStream stream(&encodedData, QIODevice::ReadOnly);
+
+    qDebug() << QString("Trying to decode") << row << column << parent.data();
+    while (!stream.atEnd()) {
+        QStandardItem *item = nullptr;
+        quintptr ptr;
+        stream >> ptr;
+        item = reinterpret_cast<QStandardItem*>(ptr);
+        SingleImageItem *single = dynamic_cast<SingleImageItem*>(item);
+        if(single != nullptr) {
+            takeItem(item->row(), item->column());
+            if(gParent) {
+                gParent->appendRow(single);
+                gParent->setText(gParent->text() + ";" + single->text());
+            }
+            else {
+                gParent = new GroupedImages;
+                gParent->setText(sParent->text());
+                int row = sParent->row();
+                gParent->appendRow(takeItem(sParent->row(), sParent->column()));
+                gParent->appendRow(single);
+                gParent->setText(gParent->text() + ";" + single->text());
+                invisibleRootItem()->insertRow(row, gParent);
+                sParent = nullptr;
+            }
+        }
+        else {
+            GroupedImages *group = dynamic_cast<GroupedImages*>(item);
+            for(int ct = group->rowCount() - 1; ct >= 0; --ct) {
+                auto single = group->takeChild(ct, 0);
+                if(gParent) {
+                    gParent->appendRow(single);
+                    gParent->setText(gParent->text() + ";" + single->text());
+                }
+                else {
+                    gParent = new GroupedImages;
+                    gParent->setText(sParent->text());
+                    int row = sParent->row();
+                    gParent->appendRow(takeItem(sParent->row(), sParent->column()));
+                    gParent->appendRow(single);
+                    gParent->setText(gParent->text() + ";" + single->text());
+                    invisibleRootItem()->insertRow(row, gParent);
+                    sParent = nullptr;
+                }
+            }
+            takeItem(group->row(), group->column());
+        }
+    }
+
+    sort(0);
+    emitDataChanged();
+
+    return true;
+}
+
+QMimeData *DirModel::mimeData(const QModelIndexList &indexes) const
+{
+    QMimeData *mimeData = new QMimeData();
+    QByteArray encodedData;
+
+    QDataStream stream(&encodedData, QIODevice::WriteOnly);
+
+    foreach (QModelIndex index, indexes) {
+        if (index.isValid()) {
+            quintptr ptr(reinterpret_cast<quintptr>(itemFromIndex(index)));
+            stream << ptr;
+            qDebug() << ptr;
+        }
+    }
+    qDebug() << QString("Data encoded");
+
+    mimeData->setData("image/sort-data", encodedData);
+    return mimeData;
+}
+
+QStringList DirModel::mimeTypes() const
+{
+    QStringList types;
+    types << "image/sort-data";
+    return types;
+}
+
+Qt::DropActions DirModel::supportedDropActions() const
+{
+    return /*Qt::MoveAction | */Qt::CopyAction;
 }

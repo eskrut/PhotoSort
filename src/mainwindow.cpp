@@ -18,11 +18,12 @@ MainWindow::MainWindow(QWidget *parent) :
     QFrame *frame = new QFrame;
     auto lo = new QHBoxLayout(frame);
 
-    dirView_ = new QListView();
+    dirView_ = new DirView();
     lo->addWidget(dirView_);
     dirView_->setViewMode(QListView::IconMode);
     dirView_->setGridSize(QSize(300, 300));
     dirView_->setResizeMode(QListView::Adjust);
+    dirView_->setMovement(QListView::Snap);
 
     setCentralWidget(frame);
 
