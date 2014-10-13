@@ -9,6 +9,7 @@
 #include <QShortcut>
 #include <QFileDialog>
 #include <QThread>
+#include <QKeySequence>
 
 #include "singleimageitem.h"
 #include "groupedimages.h"
@@ -61,15 +62,15 @@ void MainWindow::onOpenDir(const QString &dirName)
 void MainWindow::setupSignals()
 {
     QShortcut *openDirShC = new QShortcut(QKeySequence(QKeySequence::Open), this);
-    Q_ASSERT(connect(openDirShC, &QShortcut::activated, this, &MainWindow::onOpenRequest));
+    connect(openDirShC, &QShortcut::activated, this, &MainWindow::onOpenRequest);
 
     QShortcut *processShC = new QShortcut(QKeySequence(QKeySequence::Print), this);
-    Q_ASSERT(connect(processShC, SIGNAL(activated()), model_, SLOT(process())));
+    connect(processShC, SIGNAL(activated()), model_, SLOT(process()));
 
-    Q_ASSERT(connect(model_, &DirModel::updateRequest, [=](){dirView_->update();}));
-    Q_ASSERT(connect(this, &MainWindow::read, model_, &DirModel::setup));
+    connect(model_, &DirModel::updateRequest, [=](){dirView_->update();});
+    connect(this, &MainWindow::read, model_, &DirModel::setup);
 
-    Q_ASSERT(connect(dirView_->selectionModel(), &QItemSelectionModel::selectionChanged, [&](QItemSelection sel,QItemSelection desel){
+    connect(dirView_->selectionModel(), &QItemSelectionModel::selectionChanged, [&](QItemSelection sel,QItemSelection desel){
                  auto indexes = sel.indexes();
                  if (indexes.size() == 1) {
                      viewer_->viewItem(model_->itemFromIndex(indexes.front()));
@@ -77,9 +78,9 @@ void MainWindow::setupSignals()
 //                     update();
                      viewer_->updateLabels();
                  }
-             }));
+             });
     QShortcut *switchApprovShC = new QShortcut(QKeySequence("A"), this);
-    Q_ASSERT(connect(switchApprovShC, &QShortcut::activated, [=](){
+    connect(switchApprovShC, &QShortcut::activated, [=](){
         auto indexes = dirView_->selectionModel()->selectedIndexes();
         for(auto i: indexes) {
             if(i.isValid()) {
@@ -101,9 +102,9 @@ void MainWindow::setupSignals()
                 qDebug() << QString("Item is not valid");
             viewer_->updateLabels();
         }
-    }));
+    });
     QShortcut *switchApprovForceShC = new QShortcut(QKeySequence("F"), this);
-    Q_ASSERT(connect(switchApprovForceShC, &QShortcut::activated, [=](){
+    connect(switchApprovForceShC, &QShortcut::activated, [=](){
         auto indexes = dirView_->selectionModel()->selectedIndexes();
         for(auto i: indexes) {
             if(i.isValid()) {
@@ -124,9 +125,9 @@ void MainWindow::setupSignals()
                 qDebug() << QString("Item is not valid");
             viewer_->updateLabels();
         }
-    }));
+    });
     QShortcut *switchApprovRejectShC = new QShortcut(QKeySequence("R"), this);
-    Q_ASSERT(connect(switchApprovRejectShC, &QShortcut::activated, [=](){
+    connect(switchApprovRejectShC, &QShortcut::activated, [=](){
         auto indexes = dirView_->selectionModel()->selectedIndexes();
         for(auto i: indexes) {
             if(i.isValid()) {
@@ -145,9 +146,9 @@ void MainWindow::setupSignals()
                 qDebug() << QString("Item is not valid");
             viewer_->updateLabels();
         }
-    }));
+    });
     QShortcut *groupShC = new QShortcut(QKeySequence("G"), this);
-    Q_ASSERT(connect(groupShC, &QShortcut::activated, [=](){
+    connect(groupShC, &QShortcut::activated, [=](){
         auto indexes = dirView_->selectionModel()->selectedIndexes();
         QList<QStandardItem*> list;
         for(auto i: indexes) {
@@ -159,11 +160,11 @@ void MainWindow::setupSignals()
                 qDebug() << QString("Item is not valid");
         }
         if(list.size() > 1) model_->group(list);
-    }));
+    });
     QShortcut *moveFocusLeft = new QShortcut(QKeySequence("S"), this);
-    Q_ASSERT(connect(moveFocusLeft, &QShortcut::activated, viewer_, &Viewer::curToLeft));
+    connect(moveFocusLeft, &QShortcut::activated, viewer_, &Viewer::curToLeft);
     QShortcut *moveFocusRight = new QShortcut(QKeySequence("D"), this);
-    Q_ASSERT(connect(moveFocusRight, &QShortcut::activated, viewer_, &Viewer::curToRight));
+    connect(moveFocusRight, &QShortcut::activated, viewer_, &Viewer::curToRight);
 }
 
 void MainWindow::onOpenRequest()

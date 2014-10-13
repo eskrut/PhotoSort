@@ -85,11 +85,16 @@ void LoadTask::run()
     QPixmap img;
     img.load(fileName);
     img = img.scaled(250, 250, Qt::KeepAspectRatio);
-    if(orient > 1) {
+    int rot = 0;
+    if(orient == 8) rot = -90;
+    else if(orient == 6) rot = 90;
+    else if(orient == 3) rot = 180;
+    else if(orient != 1)qDebug() << QString("Unknown orientation %1").arg(orient);
+    if( rot != 0 ){
         QTransform t;
-        t.rotate(-90);
+        t.rotate(rot);
         img = img.transformed(t);
-        item_->setData(-90, static_cast<int>(SingleImageItem::Role::RotationRole));
+        item_->setData(rot, static_cast<int>(SingleImageItem::Role::RotationRole));
     }
 
     item_->setData(img, Qt::DecorationRole);

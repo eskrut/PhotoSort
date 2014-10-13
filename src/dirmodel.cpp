@@ -22,7 +22,7 @@ void DirModel::setup(const QStringList &entries)
     curWorkDir_ = QFileInfo(entries.front()).absoluteDir();
     clear();
     int numWorkers = 0;
-    const int maxWorkers = 20;
+    const int maxWorkers = 7;
     QMutex mutex;
     for(auto e : entries) {
         auto item = new SingleImageItem(e);
@@ -56,6 +56,19 @@ void DirModel::setup(const QStringList &entries)
         }));
         task->start();
     }
+    while(true) {
+        mutex.lock();
+        if(numWorkers > 0) {
+            mutex.unlock();
+            thread()->yieldCurrentThread();
+            continue;
+        }
+        else {
+            mutex.unlock();
+            break;
+        }
+    }
+    qDebug() << "Load OK";
     for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct) {
         auto item = reinterpret_cast<SingleImageItem*>(invisibleRootItem()->child(ct));
         while(true) {
@@ -95,6 +108,7 @@ void DirModel::setup(const QStringList &entries)
             break;
         }
     }
+    qDebug() << "Hashing OK";
     std::vector<std::vector<SingleImageItem*>> clusters;
     for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct)
         clusters.push_back(std::vector<SingleImageItem*>({reinterpret_cast<SingleImageItem*>(invisibleRootItem()->child(ct))}));
@@ -118,6 +132,7 @@ void DirModel::setup(const QStringList &entries)
             }
         }
     }
+    qDebug() << "Grouping OK";
     QList<QStandardItem*> newItems;
     for(int ct = invisibleRootItem()->rowCount()-1; ct >=0; --ct)
         takeItem(ct);

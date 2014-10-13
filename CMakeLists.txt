@@ -17,6 +17,6 @@ find_package(Qt5Widgets REQUIRED)
 qt5_add_resources(QRC_Srcs ${QRCs} )
 add_executable(${PROJECT_NAME} #MACOSX_BUNDLE
 	src/main.cpp ${Srcs} ${Hdrs} ${MOC_Hdrs} ${QRC_Srcs})
-qt5_use_modules(${PROJECT_NAME} Core Gui Widgets OpenGL OpenGLExtensions)
+qt5_use_modules(${PROJECT_NAME} Core Gui Widgets)
 
 target_link_libraries(${PROJECT_NAME} pHash exif)

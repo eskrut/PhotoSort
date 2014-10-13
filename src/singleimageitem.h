@@ -36,7 +36,7 @@ public:
     LoadTask(SingleImageItem *item, QObject *parent = nullptr) : QThread(parent), item_(item) {}
 private:
     SingleImageItem *item_;
-    void run() Q_DECL_OVERRIDE;
+    void run();
 };
 
 class HashTask : public QThread
@@ -46,7 +46,7 @@ public:
     HashTask(SingleImageItem *item, QObject *parent = nullptr) : QThread(parent), item_(item) {}
 private:
     SingleImageItem *item_;
-    void run() Q_DECL_OVERRIDE;
+    void run();
 };
 
 #endif // SINGLEIMAGEITEM_H

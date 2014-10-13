@@ -78,7 +78,7 @@ void Viewer::curToLeft()
     if(curGr_) {
         labels_[curGr_->curInFocus()]->setFrameStyle(QFrame::NoFrame);
         int newID = curGr_->curInFocus()-1;
-        newID = newID > 0 ? newID : curGr_->rowCount() - 1;
+        newID = newID >= 0 ? newID : curGr_->rowCount() - 1;
         curGr_->setCurInFocus(newID % curGr_->rowCount());
         labels_[curGr_->curInFocus()]->setFrameStyle(QFrame::Panel | QFrame::Sunken);
         activateImage(curGr_->child(curGr_->curInFocus()));
