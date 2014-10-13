@@ -8,7 +8,8 @@ class DirView : public QListView
     Q_OBJECT
 public:
     explicit DirView(QWidget *parent = 0);
-
+private:
+    void keyPressEvent(QKeyEvent *event);
 signals:
 
 public slots:

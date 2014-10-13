@@ -2,6 +2,7 @@
 
 #include <QDebug>
 #include <QStyle>
+#include <QtGui>
 
 #include "libexif/exif-data.h"
 
@@ -9,9 +10,9 @@ SingleImageItem::SingleImageItem(const QString &fileName) :
     QStandardItem(),
     fInfo_(fileName),
     hash_(0),
-    rotation_(0)
+    rotation_(0),
+    approved_(true)
 {
-    qDebug() << fInfo_.absoluteFilePath();
     setData(fInfo_.fileName(), Qt::DisplayRole);
     img_ = QIcon(":/load.png").pixmap(250, 250);
 }
@@ -25,11 +26,20 @@ QVariant SingleImageItem::data(int role) const
     case static_cast<int>(Role::FileNameRole):
         return fInfo_.absoluteFilePath();
         break;
-    case Qt::DecorationRole:
-        return img_;
+    case Qt::DecorationRole: {
+        QPixmap p = img_;
+        QPainter paint(&p);
+        if(approved_)
+            paint.drawPixmap(0, 0, 30, 30, QIcon(":/yes.ico").pixmap(30, 30));
+        else
+            paint.drawPixmap(0, 0, 30, 30, QIcon(":/no.ico").pixmap(30, 30));
+        return p; }
         break; 
     case static_cast<int>(Role::RotationRole):
         return rotation_;
+        break;
+    case static_cast<int>(Role::ApprovedRole):
+        return approved_;
         break;
     default:
         return QStandardItem::data(role);
@@ -48,6 +58,9 @@ void SingleImageItem::setData(const QVariant &value, int role)
     case static_cast<int>(Role::RotationRole):
         rotation_ = value.value<int>();
         break;
+    case static_cast<int>(Role::ApprovedRole):
+        approved_ = value.value<bool>();
+        break;
     default:
         QStandardItem::setData(value, role);
     }
@@ -56,7 +69,7 @@ void SingleImageItem::setData(const QVariant &value, int role)
 void SingleImageItem::load()
 {
     LoadTask *task = new LoadTask(this, new QThread);
-    Q_ASSERT(QObject::connect(task, &LoadTask::finished, [=](){this->emitDataChanged();}));
+    Q_ASSERT(QObject::connect(task, &LoadTask::finished, [&](){this->emitDataChanged();}));
     task->start();
 }
 

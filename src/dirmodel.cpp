@@ -9,10 +9,17 @@ DirModel::DirModel(QObject *parent) :
     QStandardItemModel(parent),
     distanceThreashold_(15)
 {
+    curFlags_ = Qt::NoItemFlags;
+}
+
+DirModel::~DirModel()
+{
+    writeCash();
 }
 
 void DirModel::setup(const QStringList &entries)
 {
+    curWorkDir_ = QFileInfo(entries.front()).absoluteDir();
     clear();
     int numWorkers = 0;
     const int maxWorkers = 20;
@@ -89,15 +96,8 @@ void DirModel::setup(const QStringList &entries)
         }
     }
     std::vector<std::vector<SingleImageItem*>> clusters;
-    for(int ct = 0; ct < invisibleRootItem()->rowCount() - 1; ++ct) {
+    for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct)
         clusters.push_back(std::vector<SingleImageItem*>({reinterpret_cast<SingleImageItem*>(invisibleRootItem()->child(ct))}));
-//        qDebug() << invisibleRootItem()->child(ct)->data(static_cast<int>(SingleImageItem::Role::GetHashRole)).value<ulong64>() <<
-        //                    invisibleRootItem()->child(ct+1)->data(static_cast<int>(SingleImageItem::Role::GetHashRole)).value<ulong64>() <<
-        //                    ph_hamming_distance(invisibleRootItem()->child(ct)->data(static_cast<int>(SingleImageItem::Role::GetHashRole)).value<ulong64>(),
-        //                                        invisibleRootItem()->child(ct+1)->data(static_cast<int>(SingleImageItem::Role::GetHashRole)).value<ulong64>());
-    }
-    //    bool modFlag = true;
-    //    while(modFlag) {
     for(auto cl0 = clusters.begin(); cl0 < clusters.end(); ++cl0) {
         for(auto cl1 = cl0+1; cl1 < clusters.end(); ++cl1) {
             bool isSimilar = false;
@@ -118,9 +118,7 @@ void DirModel::setup(const QStringList &entries)
             }
         }
     }
-    //    }
     QList<QStandardItem*> newItems;
-    //clear();
     for(int ct = invisibleRootItem()->rowCount()-1; ct >=0; --ct)
         takeItem(ct);
     clear();
@@ -131,15 +129,18 @@ void DirModel::setup(const QStringList &entries)
             GroupedImages *gr = new GroupedImages();
             QString text;
             for(auto i : cl) {
+                i->setData(false, static_cast<int>(SingleImageItem::Role::ApprovedRole));
                 text += i->text() + ";";
                 gr->appendRow(i);
             }
+            cl.front()->setData(true, static_cast<int>(SingleImageItem::Role::ApprovedRole));
             gr->setText(text);
             newItems.push_back(gr);
         }
     }
     for(auto i : newItems) invisibleRootItem()->appendRow(i);
 
+    curFlags_ = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
     emitDataChanged();
 }
 
@@ -151,36 +152,23 @@ void DirModel::emitDataChanged()
 
 Qt::ItemFlags DirModel::flags(const QModelIndex &index) const
 {
-    return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
+    return curFlags_;
+//    return Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
+    //    return index.flags();
 }
 
-bool DirModel::dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int column, const QModelIndex &parent)
+void DirModel::ungroup(QStandardItem *item)
 {
-    if (!data->hasFormat("image/sort-data"))
-        return false;
 
-    if (action == Qt::IgnoreAction)
-        return true;
+}
 
-    if (column > 0)
-        return false;
-
-    if (!parent.isValid())
-        return false;
-
-    SingleImageItem *sParent = dynamic_cast<SingleImageItem*>(itemFromIndex(parent));
-    GroupedImages *gParent = dynamic_cast<GroupedImages*>(itemFromIndex(parent));
+void DirModel::group(QList<QStandardItem *> &list)
+{
+    QStandardItem *first = list.takeFirst();
+    SingleImageItem *sParent = dynamic_cast<SingleImageItem*>(first);
+    GroupedImages *gParent = dynamic_cast<GroupedImages*>(first);
     Q_ASSERT(sParent || gParent);
-
-    QByteArray encodedData = data->data("image/sort-data");
-    QDataStream stream(&encodedData, QIODevice::ReadOnly);
-
-    qDebug() << QString("Trying to decode") << row << column << parent.data();
-    while (!stream.atEnd()) {
-        QStandardItem *item = nullptr;
-        quintptr ptr;
-        stream >> ptr;
-        item = reinterpret_cast<QStandardItem*>(ptr);
+    for(auto item : list) {
         SingleImageItem *single = dynamic_cast<SingleImageItem*>(item);
         if(single != nullptr) {
             takeItem(item->row(), item->column());
@@ -221,6 +209,38 @@ bool DirModel::dropMimeData(const QMimeData *data, Qt::DropAction action, int ro
             takeItem(group->row(), group->column());
         }
     }
+    sort(0);
+    emitDataChanged();
+}
+
+bool DirModel::dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int column, const QModelIndex &parent)
+{
+    if (!data->hasFormat("image/sort-data"))
+        return false;
+
+    if (action == Qt::IgnoreAction)
+        return true;
+
+    if (column > 0)
+        return false;
+
+    if (!parent.isValid())
+        return false;
+
+    QList<QStandardItem*> list;
+    list << itemFromIndex(parent);
+
+    QByteArray encodedData = data->data("image/sort-data");
+    QDataStream stream(&encodedData, QIODevice::ReadOnly);
+
+    while (!stream.atEnd()) {
+        QStandardItem *item = nullptr;
+        quintptr ptr;
+        stream >> ptr;
+        item = reinterpret_cast<QStandardItem*>(ptr);
+        list << item;
+    }
+    group(list);
 
     sort(0);
     emitDataChanged();
@@ -242,7 +262,6 @@ QMimeData *DirModel::mimeData(const QModelIndexList &indexes) const
             qDebug() << ptr;
         }
     }
-    qDebug() << QString("Data encoded");
 
     mimeData->setData("image/sort-data", encodedData);
     return mimeData;
@@ -258,4 +277,97 @@ QStringList DirModel::mimeTypes() const
 Qt::DropActions DirModel::supportedDropActions() const
 {
     return /*Qt::MoveAction | */Qt::CopyAction;
+}
+
+void DirModel::process(const QString &dirName)
+{
+    if(!curWorkDir_.mkdir(dirName)) return;
+    QStringList filesToCopy;
+    for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct) {
+        auto item = invisibleRootItem()->child(ct);
+        SingleImageItem *single = dynamic_cast<SingleImageItem*>(item);
+        if(single) {
+            if(single->data(static_cast<int>(SingleImageItem::Role::ApprovedRole)).toBool())
+                filesToCopy << single->data(static_cast<int>(SingleImageItem::Role::FileNameRole)).toString();
+        }
+        else {
+            GroupedImages *gr = dynamic_cast<GroupedImages*>(item);
+            if(gr) {
+                for(int childCt = 0; childCt < gr->rowCount(); ++childCt) {
+                    auto single = gr->child(childCt);
+                    if(single->data(static_cast<int>(SingleImageItem::Role::ApprovedRole)).toBool())
+                        filesToCopy << single->data(static_cast<int>(SingleImageItem::Role::FileNameRole)).toString();
+                }
+            }
+        }
+    }
+    filesToCopy.sort();
+    int count = 1;
+    for(auto f : filesToCopy) {
+        QFileInfo fInfo(f);
+        QString newName = fInfo.absolutePath() + "/" + dirName + "/" + QString("%1_").arg(count++, 5, 10, QChar('0')) + fInfo.fileName();
+        QFile::copy(f, newName);
+    }
+}
+
+void DirModel::writeCash()
+{
+    QFile cash(curWorkDir_.absolutePath()+"/cash");
+    cash.open(QIODevice::WriteOnly);
+    QTextStream out(&cash);
+    for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct) {
+        auto item = invisibleRootItem()->child(ct);
+        SingleImageItem *single = dynamic_cast<SingleImageItem*>(item);
+        if(single) {
+            QString line;
+            line = line.append(single->text()).append("|").append("%1|").arg(single->data(static_cast<int>(SingleImageItem::Role::ApprovedRole)).toBool());
+            out << line << endl;
+        }
+        else {
+            GroupedImages *gr = dynamic_cast<GroupedImages*>(item);
+            if(gr) {
+                QString line;
+                for(int childCt = 0; childCt < gr->rowCount(); ++childCt) {
+                    auto single = gr->child(childCt);
+                    line = line.append(single->text()).append("|").append("%1|").arg(single->data(static_cast<int>(SingleImageItem::Role::ApprovedRole)).toBool());
+                }
+                out << line << endl;
+            }
+        }
+    }
+    cash.close();
+}
+
+bool DirModel::readCash(const QString &dir)
+{
+    curWorkDir_ = QDir(dir);
+    QFile cash(curWorkDir_.absolutePath()+"/cash");
+    if(cash.open(QIODevice::ReadOnly)) {
+        QTextStream in(&cash);
+        QString line;
+        do {
+            line = in.readLine();
+            auto items = line.split("|", QString::SkipEmptyParts);
+            if(items.size() == 2) {
+                SingleImageItem *single = new SingleImageItem(curWorkDir_.absolutePath()+"/"+items[0]);
+                single->load();
+                single->setData(items[1].toInt(), static_cast<int>(SingleImageItem::Role::ApprovedRole));
+                invisibleRootItem()->appendRow(single);
+            }
+            else if(items.size() > 2){
+                GroupedImages *gr = new GroupedImages;
+                for(int ct = 0; ct < items.size(); ct += 2){
+                    SingleImageItem *single = new SingleImageItem(curWorkDir_.absolutePath()+"/"+items[ct]);
+                    single->load();
+                    single->setData(items[ct+1].toInt(), static_cast<int>(SingleImageItem::Role::ApprovedRole));
+                    gr->appendRow(single);
+                }
+                invisibleRootItem()->appendRow(gr);
+            }
+        } while (!line.isNull());
+        curFlags_ = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
+        emitDataChanged();
+        return true;
+    }
+    return false;
 }

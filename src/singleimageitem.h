@@ -14,13 +14,15 @@ public:
     enum class Role {
         GetHashRole = Qt::UserRole + 1,
         FileNameRole,
-        RotationRole
+        RotationRole,
+        ApprovedRole
     };
 private:
     QFileInfo fInfo_;
     ulong64 hash_;
     QPixmap img_;
     int rotation_;
+    bool approved_;
 public:
     QVariant data(int role) const;
     void setData(const QVariant &value, int role);

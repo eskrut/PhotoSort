@@ -1,5 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file>load.png</file>
+        <file>no.ico</file>
+        <file>yes.ico</file>
     </qresource>
 </RCC>
