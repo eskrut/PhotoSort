@@ -18,7 +18,7 @@ signals:
     void updateRequest();
     void selectionChanged(const QString &fileName);
 public slots:
-    void setup(const QStringList &entries);
+    void setup(const QStringList &entries, const QString &baseDir);
 private slots:
     void emitDataChanged();
 public:
@@ -36,7 +36,7 @@ public:
 public slots:
     void process(const QString &dirName = QString("theBest"));
 public:
-    void writeCash();
+    void writeCache();
     bool readCash(const QString &dir);
 };
 

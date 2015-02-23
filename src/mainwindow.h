@@ -19,7 +19,7 @@ private:
     Viewer *viewer_;
 
 signals:
-    void read(const QStringList &entries);
+    void read(const QStringList &entries, const QString &baseDir);
 
 public slots:
     void onOpenDir(const QString &dirNAme);

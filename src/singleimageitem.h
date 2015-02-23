@@ -10,7 +10,7 @@
 class SingleImageItem : public QStandardItem
 {
 public:
-    explicit SingleImageItem(const QString &fileName);
+    explicit SingleImageItem(const QString &fileName, const QString &rootDir = QString());
     enum class Role {
         GetHashRole = Qt::UserRole + 1,
         FileNameRole,

@@ -14,18 +14,19 @@ DirModel::DirModel(QObject *parent) :
 
 DirModel::~DirModel()
 {
-    writeCash();
+    writeCache();
 }
 
-void DirModel::setup(const QStringList &entries)
+void DirModel::setup(const QStringList &entries, const QString &baseDir)
 {
-    curWorkDir_ = QFileInfo(entries.front()).absoluteDir();
+//    curWorkDir_ = QFileInfo(entries.front()).absoluteDir();
+    curWorkDir_ = baseDir;
     clear();
     int numWorkers = 0;
     const int maxWorkers = 7;
     QMutex mutex;
     for(auto e : entries) {
-        auto item = new SingleImageItem(e);
+        auto item = new SingleImageItem(e, curWorkDir_.absolutePath());
         invisibleRootItem()->appendRow(item);
     }
     for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct) {
@@ -43,17 +44,17 @@ void DirModel::setup(const QStringList &entries)
             }
         }
         LoadTask *task = new LoadTask(item, new QThread);
-        Q_ASSERT(connect(task, &LoadTask::finished, this, &DirModel::emitDataChanged));
-//        Q_ASSERT(connect(task, &LoadTask::started, [&](){
+        connect(task, &LoadTask::finished, this, &DirModel::emitDataChanged);
+//        connect(task, &LoadTask::started, [&](){
             mutex.lock();
             numWorkers++;
             mutex.unlock();
 //        }));
-        Q_ASSERT(connect(task, &LoadTask::finished, [&](){
+        connect(task, &LoadTask::finished, [&](){
             mutex.lock();
             numWorkers--;
             mutex.unlock();
-        }));
+        });
         task->start();
     }
     while(true) {
@@ -84,16 +85,16 @@ void DirModel::setup(const QStringList &entries)
             }
         }
         HashTask *task = new HashTask(item, new QThread);
-//        Q_ASSERT(connect(task, &LoadTask::started, [&](){
+//        connect(task, &LoadTask::started, [&](){
             mutex.lock();
             numWorkers++;
             mutex.unlock();
-//        }));
-        Q_ASSERT(connect(task, &LoadTask::finished, [&](){
+//        });
+        connect(task, &LoadTask::finished, [&](){
             mutex.lock();
             numWorkers--;
             mutex.unlock();
-        }));
+        });
         task->start();
     }
     while(true) {
@@ -320,14 +321,14 @@ void DirModel::process(const QString &dirName)
     int count = 1;
     for(auto f : filesToCopy) {
         QFileInfo fInfo(f);
-        QString newName = fInfo.absolutePath() + "/" + dirName + "/" + QString("%1_").arg(count++, 5, 10, QChar('0')) + fInfo.fileName();
+        QString newName = curWorkDir_.absolutePath() + "/"+dirName+"/" + QString("%1_").arg(count++, 5, 10, QChar('0')) + fInfo.fileName();
         QFile::copy(f, newName);
     }
 }
 
-void DirModel::writeCash()
+void DirModel::writeCache()
 {
-    QFile cash(curWorkDir_.absolutePath()+"/cash");
+    QFile cash(curWorkDir_.absolutePath()+"/cache");
     cash.open(QIODevice::WriteOnly);
     QTextStream out(&cash);
     for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct) {
@@ -335,7 +336,9 @@ void DirModel::writeCash()
         SingleImageItem *single = dynamic_cast<SingleImageItem*>(item);
         if(single) {
             QString line;
-            line = line.append(single->text()).append("|").append("%1|").arg(single->data(static_cast<int>(SingleImageItem::Role::ApprovedRole)).toBool());
+            QString rec = single->data(static_cast<int>(SingleImageItem::Role::FileNameRole)).toString();
+            rec = rec.replace(curWorkDir_.absolutePath(), "");
+            line = line.append(rec).append("|").append("%1|").arg(single->data(static_cast<int>(SingleImageItem::Role::ApprovedRole)).toBool());
             out << line << endl;
         }
         else {
@@ -344,7 +347,9 @@ void DirModel::writeCash()
                 QString line;
                 for(int childCt = 0; childCt < gr->rowCount(); ++childCt) {
                     auto single = gr->child(childCt);
-                    line = line.append(single->text()).append("|").append("%1|").arg(single->data(static_cast<int>(SingleImageItem::Role::ApprovedRole)).toBool());
+                    QString rec = single->data(static_cast<int>(SingleImageItem::Role::FileNameRole)).toString();
+                    rec = rec.replace(curWorkDir_.absolutePath(), "");
+                    line = line.append(rec).append("|").append("%1|").arg(single->data(static_cast<int>(SingleImageItem::Role::ApprovedRole)).toBool());
                 }
                 out << line << endl;
             }
@@ -356,7 +361,7 @@ void DirModel::writeCash()
 bool DirModel::readCash(const QString &dir)
 {
     curWorkDir_ = QDir(dir);
-    QFile cash(curWorkDir_.absolutePath()+"/cash");
+    QFile cash(curWorkDir_.absolutePath()+"/cache");
     if(cash.open(QIODevice::ReadOnly)) {
         QTextStream in(&cash);
         QString line;
@@ -364,7 +369,7 @@ bool DirModel::readCash(const QString &dir)
             line = in.readLine();
             auto items = line.split("|", QString::SkipEmptyParts);
             if(items.size() == 2) {
-                SingleImageItem *single = new SingleImageItem(curWorkDir_.absolutePath()+"/"+items[0]);
+                SingleImageItem *single = new SingleImageItem(curWorkDir_.absolutePath()+"/"+items[0], curWorkDir_.absolutePath());
                 single->load();
                 single->setData(items[1].toInt(), static_cast<int>(SingleImageItem::Role::ApprovedRole));
                 invisibleRootItem()->appendRow(single);
@@ -372,7 +377,7 @@ bool DirModel::readCash(const QString &dir)
             else if(items.size() > 2){
                 GroupedImages *gr = new GroupedImages;
                 for(int ct = 0; ct < items.size(); ct += 2){
-                    SingleImageItem *single = new SingleImageItem(curWorkDir_.absolutePath()+"/"+items[ct]);
+                    SingleImageItem *single = new SingleImageItem(curWorkDir_.absolutePath()+"/"+items[ct], curWorkDir_.absolutePath());
                     single->load();
                     single->setData(items[ct+1].toInt(), static_cast<int>(SingleImageItem::Role::ApprovedRole));
                     gr->appendRow(single);

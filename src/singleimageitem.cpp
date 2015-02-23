@@ -6,14 +6,17 @@
 
 #include "libexif/exif-data.h"
 
-SingleImageItem::SingleImageItem(const QString &fileName) :
+SingleImageItem::SingleImageItem(const QString &fileName, const QString &rootDir) :
     QStandardItem(),
     fInfo_(fileName),
     hash_(0),
     rotation_(0),
     approved_(true)
 {
-    setData(fInfo_.fileName(), Qt::DisplayRole);
+    if(rootDir.isEmpty())
+        setData(fInfo_.fileName(), Qt::DisplayRole);
+    else
+        setData(fInfo_.absoluteFilePath().replace(rootDir, ""), Qt::DisplayRole);
     img_ = QIcon(":/load.png").pixmap(250, 250);
 }
 

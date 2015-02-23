@@ -10,9 +10,12 @@
 #include <QFileDialog>
 #include <QThread>
 #include <QKeySequence>
+#include <QStringList>
 
 #include "singleimageitem.h"
 #include "groupedimages.h"
+#include <functional>
+#include <QDebug>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
@@ -50,13 +53,23 @@ MainWindow::~MainWindow()
 
 void MainWindow::onOpenDir(const QString &dirName)
 {
-    QDir dir(dirName);
-    auto entries = dir.entryList(QStringList("*.JPG"));
-    for(auto &e : entries){
-        e = dirName + "/" + e;
-    }
-//    model_->setup(entries);
-    emit read(entries);
+    QStringList entries;
+    std::function<QStringList(const QString &dirName)> recurEntrues = nullptr;
+    recurEntrues = [&](const QString &dirName){
+        QDir dir(dirName);
+        QStringList subDirs = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        QStringList entries;
+        for(const auto &d : subDirs)
+            entries << recurEntrues(dirName+"/"+d);
+        for(const auto &e : dir.entryList(QStringList("*.JPG"))){
+            entries << dirName + "/" + e;
+        }
+        return entries;
+    };
+
+    entries = recurEntrues(dirName);
+
+    emit read(entries, dirName);
 }
 
 void MainWindow::setupSignals()
@@ -159,7 +172,10 @@ void MainWindow::setupSignals()
             else
                 qDebug() << QString("Item is not valid");
         }
-        if(list.size() > 1) model_->group(list);
+        if(list.size() > 1) {
+            model_->group(list);
+            model_->writeCache();
+        }
     });
     QShortcut *moveFocusLeft = new QShortcut(QKeySequence("S"), this);
     connect(moveFocusLeft, &QShortcut::activated, viewer_, &Viewer::curToLeft);
