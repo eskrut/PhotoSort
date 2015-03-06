@@ -54,6 +54,7 @@ QVariant SingleImageItem::data(int role) const
 
 void SingleImageItem::setData(const QVariant &value, int role)
 {
+    emitDataChanged();
     switch (role) {
     case static_cast<int>(Role::GetHashRole):
         hash_ = value.value<ulong64>();
@@ -72,16 +73,9 @@ void SingleImageItem::setData(const QVariant &value, int role)
     }
 }
 
-void SingleImageItem::load()
+int SingleImageItem::load()
 {
-    LoadTask *task = new LoadTask(this, new QThread);
-    Q_ASSERT(QObject::connect(task, &LoadTask::finished, [&](){this->emitDataChanged();}));
-    task->start();
-}
-
-void LoadTask::run()
-{
-    QString fileName = item_->data(static_cast<int>(SingleImageItem::Role::FileNameRole)).toString();
+    QString fileName = data(static_cast<int>(SingleImageItem::Role::FileNameRole)).toString();
     ExifData *ed = exif_data_new_from_file(fileName.toLocal8Bit());
     ExifEntry *entry = exif_content_get_entry(ed->ifd[EXIF_IFD_0], EXIF_TAG_ORIENTATION);
     ExifByteOrder byte_order;
@@ -100,18 +94,10 @@ void LoadTask::run()
         QTransform t;
         t.rotate(rot);
         img = img.transformed(t);
-        item_->setData(rot, static_cast<int>(SingleImageItem::Role::RotationRole));
+        setData(rot, static_cast<int>(SingleImageItem::Role::RotationRole));
     }
 
-    item_->setData(img, Qt::DecorationRole);
+    setData(img, Qt::DecorationRole);
     exif_data_free(ed);
-}
-
-
-void HashTask::run()
-{
-    ulong64 hash;
-    QString fileName = item_->data(static_cast<int>(SingleImageItem::Role::FileNameRole)).toString();
-    if( ph_dct_imagehash(fileName.toLocal8Bit(), hash) >= 0)
-        item_->setData(hash, static_cast<int>(SingleImageItem::Role::GetHashRole));
+    return row();
 }

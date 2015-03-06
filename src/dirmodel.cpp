@@ -4,10 +4,16 @@
 #include <QDebug>
 #include <QMutex>
 #include <QMimeData>
+#include <QString>
+#include <QTransform>
+#include <list>
+#include <atomic>
+#include "libexif/exif-data.h"
 
 DirModel::DirModel(QObject *parent) :
     QStandardItemModel(parent),
-    distanceThreashold_(15)
+    distanceThreashold_(15),
+    pool_(new ThreadPool(12))
 {
     curFlags_ = Qt::NoItemFlags;
 }
@@ -29,86 +35,40 @@ void DirModel::setup(const QStringList &entries, const QString &baseDir)
         auto item = new SingleImageItem(e, curWorkDir_.absolutePath());
         invisibleRootItem()->appendRow(item);
     }
+    std::list<std::future<int>> loadFutures, hashFutures;
     for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct) {
         auto item = reinterpret_cast<SingleImageItem*>(invisibleRootItem()->child(ct));
-        while(true) {
-            mutex.lock();
-            if(numWorkers >= maxWorkers) {
-                mutex.unlock();
-                thread()->yieldCurrentThread();
-                continue;
-            }
-            else {
-                mutex.unlock();
-                break;
-            }
-        }
-        LoadTask *task = new LoadTask(item, new QThread);
-        connect(task, &LoadTask::finished, this, &DirModel::emitDataChanged);
-//        connect(task, &LoadTask::started, [&](){
-            mutex.lock();
-            numWorkers++;
-            mutex.unlock();
-//        }));
-        connect(task, &LoadTask::finished, [&](){
-            mutex.lock();
-            numWorkers--;
-            mutex.unlock();
-        });
-        task->start();
+        auto load = [item](){
+            return item->load();
+        };
+        loadFutures.push_back(pool_->enqueue(load));
     }
-    while(true) {
-        mutex.lock();
-        if(numWorkers > 0) {
-            mutex.unlock();
-            thread()->yieldCurrentThread();
-            continue;
-        }
-        else {
-            mutex.unlock();
-            break;
-        }
+    std::atomic<int> progress(0);
+    for(auto && f : loadFutures) {
+        f.get();
+        progress++;
+        loadProgress(progress*100/invisibleRootItem()->rowCount());
     }
+    emit(loadDone());
     qDebug() << "Load OK";
     for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct) {
         auto item = reinterpret_cast<SingleImageItem*>(invisibleRootItem()->child(ct));
-        while(true) {
-            mutex.lock();
-            if(numWorkers >= maxWorkers) {
-                mutex.unlock();
-                thread()->yieldCurrentThread();
-                continue;
-            }
-            else {
-                mutex.unlock();
-                break;
-            }
-        }
-        HashTask *task = new HashTask(item, new QThread);
-//        connect(task, &LoadTask::started, [&](){
-            mutex.lock();
-            numWorkers++;
-            mutex.unlock();
-//        });
-        connect(task, &LoadTask::finished, [&](){
-            mutex.lock();
-            numWorkers--;
-            mutex.unlock();
-        });
-        task->start();
+        auto hash = [item](){
+            ulong64 hash;
+            QString fileName = item->data(static_cast<int>(SingleImageItem::Role::FileNameRole)).toString();
+            if( ph_dct_imagehash(fileName.toLocal8Bit(), hash) >= 0)
+                item->setData(hash, static_cast<int>(SingleImageItem::Role::GetHashRole));
+            return item->row();
+        };
+        hashFutures.push_back(pool_->enqueue(hash));
     }
-    while(true) {
-        mutex.lock();
-        if(numWorkers > 0) {
-            mutex.unlock();
-            thread()->yieldCurrentThread();
-            continue;
-        }
-        else {
-            mutex.unlock();
-            break;
-        }
+    progress = 0;
+    for(auto && f : hashFutures) {
+        f.get();
+        progress++;
+        hashProgress(progress*100/invisibleRootItem()->rowCount());
     }
+    emit(hashDone());
     qDebug() << "Hashing OK";
     std::vector<std::vector<SingleImageItem*>> clusters;
     for(int ct = 0; ct < invisibleRootItem()->rowCount(); ++ct)
@@ -158,6 +118,7 @@ void DirModel::setup(const QStringList &entries, const QString &baseDir)
 
     curFlags_ = Qt::ItemIsEnabled | Qt::ItemIsSelectable | Qt::ItemIsDragEnabled | Qt::ItemIsDropEnabled;
     emitDataChanged();
+    emit(done());
 }
 
 void DirModel::emitDataChanged()

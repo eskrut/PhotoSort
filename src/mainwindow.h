@@ -6,6 +6,7 @@
 #include "dirmodel.h"
 #include "dirview.h"
 #include "viewer.h"
+#include <QProgressBar>
 
 class MainWindow : public QMainWindow
 {
@@ -17,6 +18,7 @@ private:
     DirView *dirView_;
     DirModel *model_;
     Viewer *viewer_;
+    QProgressBar *progress_;
 
 signals:
     void read(const QStringList &entries, const QString &baseDir);

@@ -21,10 +21,12 @@ MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
 {
     QFrame *frame = new QFrame;
-    auto lo = new QHBoxLayout(frame);
+    auto lo = new QVBoxLayout(frame);
+    auto lo1 = new QHBoxLayout();
+    lo->addLayout(lo1);
 
     dirView_ = new DirView();
-    lo->addWidget(dirView_);
+    lo1->addWidget(dirView_);
     dirView_->setViewMode(QListView::IconMode);
     dirView_->setGridSize(QSize(300, 300));
     dirView_->setResizeMode(QListView::Adjust);
@@ -40,8 +42,12 @@ MainWindow::MainWindow(QWidget *parent) :
     dirView_->setSelectionModel(new QItemSelectionModel(model_));
 
     viewer_ = new Viewer(this);
-    lo->addWidget(viewer_);
+    lo1->addWidget(viewer_);
     viewer_->setMinimumWidth(200);
+
+    progress_ = new QProgressBar(this);
+    progress_->setTextVisible(true);
+    lo->addWidget(progress_);
 
     setupSignals();
 }
@@ -181,6 +187,14 @@ void MainWindow::setupSignals()
     connect(moveFocusLeft, &QShortcut::activated, viewer_, &Viewer::curToLeft);
     QShortcut *moveFocusRight = new QShortcut(QKeySequence("D"), this);
     connect(moveFocusRight, &QShortcut::activated, viewer_, &Viewer::curToRight);
+
+    connect(model_, &DirModel::loadProgress, progress_, &QProgressBar::setValue);
+    connect(model_, &DirModel::hashProgress, progress_, &QProgressBar::setValue);
+
+    progress_->setFormat(QString("%p"));
+    connect(model_, &DirModel::loadDone, [=](){progress_->setFormat("%p%");});
+    connect(model_, &DirModel::hashDone, [=](){progress_->setFormat("%p%");});
+    connect(model_, &DirModel::done, [=](){progress_->setVisible(false);});
 }
 
 void MainWindow::onOpenRequest()

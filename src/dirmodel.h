@@ -3,6 +3,8 @@
 
 #include <QDir>
 #include <QStandardItemModel>
+#include "../threadpool/ThreadPool.h"
+#include <memory>
 
 class DirModel : public QStandardItemModel
 {
@@ -14,9 +16,15 @@ private:
     int distanceThreashold_;
     QDir curWorkDir_;
     Qt::ItemFlags curFlags_;
+    std::unique_ptr<ThreadPool> pool_;
 signals:
     void updateRequest();
     void selectionChanged(const QString &fileName);
+    void loadProgress(int);
+    void hashProgress(int);
+    void loadDone();
+    void hashDone();
+    void done();
 public slots:
     void setup(const QStringList &entries, const QString &baseDir);
 private slots:
