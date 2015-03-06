@@ -37,12 +37,15 @@ QVariant SingleImageItem::data(int role) const
         else
             paint.drawPixmap(0, 0, 30, 30, QIcon(":/no.ico").pixmap(30, 30));
         return p; }
-        break; 
+        break;
     case static_cast<int>(Role::RotationRole):
         return rotation_;
         break;
     case static_cast<int>(Role::ApprovedRole):
         return approved_;
+        break;
+    case static_cast<int>(SingleImageItem::Role::GroupedFiles):
+        return QStringList(data(Qt::DisplayRole).toString());
         break;
     default:
         return QStandardItem::data(role);

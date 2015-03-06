@@ -180,6 +180,7 @@ void DirModel::ungroup(QStandardItem *item)
 
 void DirModel::group(QList<QStandardItem *> &list)
 {
+    for(auto item : list) qDebug() << item->data(static_cast<int>(SingleImageItem::Role::GroupedFiles));
     QStandardItem *first = list.takeFirst();
     SingleImageItem *sParent = dynamic_cast<SingleImageItem*>(first);
     GroupedImages *gParent = dynamic_cast<GroupedImages*>(first);
@@ -226,6 +227,7 @@ void DirModel::group(QList<QStandardItem *> &list)
         }
     }
     sort(0);
+    qDebug() << gParent->data(static_cast<int>(SingleImageItem::Role::GroupedFiles));
     emitDataChanged();
 }
 

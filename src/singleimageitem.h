@@ -15,7 +15,8 @@ public:
         GetHashRole = Qt::UserRole + 1,
         FileNameRole,
         RotationRole,
-        ApprovedRole
+        ApprovedRole,
+        GroupedFiles
     };
 private:
     QFileInfo fInfo_;

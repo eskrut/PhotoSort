@@ -1,5 +1,6 @@
 #include "groupedimages.h"
 #include <QDebug>
+#include <QStringList>
 
 GroupedImages::GroupedImages():
     QStandardItem()
@@ -23,6 +24,13 @@ QVariant GroupedImages::data(int role) const
     case static_cast<int>(SingleImageItem::Role::ApprovedRole):
         return child(curInFocus_)->data(static_cast<int>(SingleImageItem::Role::ApprovedRole));
         break;
+    case static_cast<int>(SingleImageItem::Role::GroupedFiles):
+    {
+        QStringList files;
+        for(int ct = 0; ct < rowCount();++ct) files << child(ct)->data(static_cast<int>(SingleImageItem::Role::GroupedFiles)).toStringList();
+        return files;
+        break;
+    }
     default:
         return QStandardItem::data(role);
     }
