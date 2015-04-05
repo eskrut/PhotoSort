@@ -25,6 +25,7 @@ signals:
     void loadDone();
     void hashDone();
     void done();
+    void grouped(QStandardItem *);
 public slots:
     void setup(const QStringList &entries, const QString &baseDir);
 private slots:
@@ -34,7 +35,7 @@ public:
     Qt::ItemFlags flags(const QModelIndex &index) const;
 //    bool removeRows(int row, int count, const QModelIndex &parent);
 
-    void ungroup(QStandardItem *item);
+    void ungroup(QList<QStandardItem *> &list);
     void group(QList<QStandardItem *> &list);
     bool dropMimeData(const QMimeData *data, Qt::DropAction action, int row, int column, const QModelIndex &parent);
     QMimeData *mimeData(const QModelIndexList &indexes) const;
@@ -43,9 +44,13 @@ public:
     Qt::DropActions supportedDropActions() const;
 public slots:
     void process(const QString &dirName = QString("theBest"));
-public:
     void writeCache();
-    bool readCash(const QString &dir);
+    void readCache(const QString &dir);
+public:
+    bool isCacheAvaileble(const QString &dir);
+    int numImages();
+    int numAccepted();
+
 };
 
 #endif // DIRMODEL_H

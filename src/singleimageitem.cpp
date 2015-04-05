@@ -10,6 +10,7 @@ SingleImageItem::SingleImageItem(const QString &fileName, const QString &rootDir
     QStandardItem(),
     fInfo_(fileName),
     hash_(0),
+    img_(QPixmap()),
     rotation_(0),
     approved_(true)
 {

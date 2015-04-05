@@ -7,6 +7,7 @@
 #include "dirview.h"
 #include "viewer.h"
 #include <QProgressBar>
+#include <QStatusBar>
 
 class MainWindow : public QMainWindow
 {
@@ -19,9 +20,11 @@ private:
     DirModel *model_;
     Viewer *viewer_;
     QProgressBar *progress_;
+    QStatusBar *st_;
 
 signals:
     void read(const QStringList &entries, const QString &baseDir);
+    void readCache(const QString &baseDir);
 
 public slots:
     void onOpenDir(const QString &dirNAme);

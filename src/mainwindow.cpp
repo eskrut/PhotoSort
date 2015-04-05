@@ -11,6 +11,8 @@
 #include <QThread>
 #include <QKeySequence>
 #include <QStringList>
+#include <QStatusBar>
+#include <QString>
 
 #include "singleimageitem.h"
 #include "groupedimages.h"
@@ -48,6 +50,11 @@ MainWindow::MainWindow(QWidget *parent) :
     progress_ = new QProgressBar(this);
     progress_->setTextVisible(true);
     lo->addWidget(progress_);
+
+    st_ = new QStatusBar(this);
+    st_->setVisible(true);
+    setStatusBar(st_);
+    st_->showMessage("Ready");
 
     setupSignals();
 }
@@ -88,6 +95,7 @@ void MainWindow::setupSignals()
 
     connect(model_, &DirModel::updateRequest, [=](){dirView_->update();});
     connect(this, &MainWindow::read, model_, &DirModel::setup);
+    connect(this, &MainWindow::readCache, model_, &DirModel::readCache);
 
     connect(dirView_->selectionModel(), &QItemSelectionModel::selectionChanged, [&](QItemSelection sel,QItemSelection desel){
                  auto indexes = sel.indexes();
@@ -121,6 +129,7 @@ void MainWindow::setupSignals()
                 qDebug() << QString("Item is not valid");
             viewer_->updateLabels();
         }
+        st_->showMessage(QString("Accepted %1 of %2 images").arg(model_->numAccepted()).arg(model_->numImages()));
     });
     QShortcut *switchApprovForceShC = new QShortcut(QKeySequence("F"), this);
     connect(switchApprovForceShC, &QShortcut::activated, [=](){
@@ -144,6 +153,7 @@ void MainWindow::setupSignals()
                 qDebug() << QString("Item is not valid");
             viewer_->updateLabels();
         }
+        st_->showMessage(QString("Accepted %1 of %2 images").arg(model_->numAccepted()).arg(model_->numImages()));
     });
     QShortcut *switchApprovRejectShC = new QShortcut(QKeySequence("R"), this);
     connect(switchApprovRejectShC, &QShortcut::activated, [=](){
@@ -165,6 +175,7 @@ void MainWindow::setupSignals()
                 qDebug() << QString("Item is not valid");
             viewer_->updateLabels();
         }
+        st_->showMessage(QString("Accepted %1 of %2 images").arg(model_->numAccepted()).arg(model_->numImages()));
     });
     QShortcut *groupShC = new QShortcut(QKeySequence("G"), this);
     connect(groupShC, &QShortcut::activated, [=](){
@@ -181,6 +192,30 @@ void MainWindow::setupSignals()
         if(list.size() > 1) {
             model_->group(list);
             model_->writeCache();
+        }
+    });
+    QShortcut *ungroupShC = new QShortcut(QKeySequence("U"), this);
+    connect(ungroupShC, &QShortcut::activated, [=](){
+        auto indexes = dirView_->selectionModel()->selectedIndexes();
+        QList<QStandardItem*> list;
+        for(auto i: indexes) {
+            if(i.isValid()) {
+                auto item = model_->itemFromIndex(i);
+                list << item;
+            }
+            else
+                qDebug() << QString("Item is not valid");
+        }
+        if(list.size() > 1) {
+            model_->ungroup(list);
+            model_->writeCache();
+        }
+    });
+    connect(model_, &DirModel::grouped, [=](QStandardItem *g){
+        if(g){
+            dirView_->scrollTo(g->index());
+            dirView_->selectionModel()->clearSelection();
+            dirView_->selectionModel()->select(g->index(), QItemSelectionModel::Select);
         }
     });
     QShortcut *moveFocusLeft = new QShortcut(QKeySequence("S"), this);
@@ -201,7 +236,9 @@ void MainWindow::onOpenRequest()
 {
     QString dirName = QFileDialog::getExistingDirectory(this);
     if(!dirName.isEmpty()) {
-        if(!model_->readCash(dirName))
+        if(model_->isCacheAvaileble(dirName))
+            readCache(dirName);
+        else
             onOpenDir(dirName);
     }
 }
